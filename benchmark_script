@@ -1,0 +1,115 @@
+#!/bin/bash
+
+echo ">>>>>>Script started!<<<<<<"
+
+#--------------------------------------------------------
+# Test 3 - Remote Atomics vs W/O Remote Atomics (Baseline)
+#--------------------------------------------------------
+maxatomics=$((2**32)) #18446744073709551616  # 1073741824 #268435456 # 2 pow 28
+currentatomics=$((2**10))   # 2 pow 10
+while [ $currentatomics -le $maxatomics ]
+do
+        valIn2sPow=$(echo "l($(((currentatomics/1024)*1024)))/l(2)" | bc -l)
+
+	maxrandomnumber=40
+	while [ $maxrandomnumber -le 4000 ]
+	do
+		echo ""
+	        echo ">>>Launching script to record benchmarks for Local+Remote Atomics. GridSize: $((currentatomics/1024)), BlockSize: 1024, MaxRandomNumber: ${maxrandomnumber}."
+		/usr/local/cuda/bin/nvprof --normalized-time-unit s --print-gpu-summary --log-file "./output/Exp3/Exp3_BL_2Pow${valIn2sPow%.*}RemotePlusLocalAtomics_RAND${maxrandomnumber}.csv" --csv ./sandbox s2 $((currentatomics/1024)) $maxrandomnumber "./output/Exp3/Exp3_BL_2Pow${valIn2sPow%.*}RemotePlusLocalAtomics_RAND${maxrandomnumber}_cpu.csv"
+	        wait $!
+        	echo "<<<"
+	        echo ""
+        	sleep 1
+	        wait $!
+
+	        echo ""
+        	echo ">>>Launching script to record benchmarks for Local Atomics. GridSize: $((currentatomics/1024)), BlockSize: 1024, MaxRandomNumber: ${maxrandomnumber}."
+		/usr/local/cuda/bin/nvprof --normalized-time-unit s --print-gpu-summary --log-file "./output/Exp3/Exp3_BL_2Pow${valIn2sPow%.*}LocalAtomics_RAND${maxrandomnumber}.csv" --csv ./sandbox b2 $((currentatomics/1024)) $maxrandomnumber "./output/Exp3/Exp3_BL_2Pow${valIn2sPow%.*}LocalAtomics_RAND${maxrandomnumber}_cpu.csv"
+	        wait $!
+	        echo "<<<"
+	        echo ""
+	        sleep 1
+	        wait $!
+
+
+                echo ""
+                echo ">>>Launching script to record benchmarks for Local Atomics. GridSize: $((currentatomics/1024)), BlockSize: 1024, MaxRandomNumber: ${maxrandomnumber}."
+                /usr/local/cuda/bin/nvprof --normalized-time-unit s --print-gpu-summary --log-file "./output/Exp3/Exp3_BL_2Pow${valIn2sPow%.*}LocalAtomics_CPUMerge_RAND${maxrandomnumber}.csv" --csv ./sandbox b1 $((currentatomics/1024)) $maxrandomnumber "./output/Exp3/Exp3_BL_2Pow${valIn2sPow%.*}LocalAtomics_CPUMerge_RAND${maxrandomnumber}_cpu.csv"
+                wait $!
+                echo "<<<"
+                echo ""
+                sleep 1
+                wait $!
+
+
+		maxrandomnumber=$((maxrandomnumber*10))
+	done
+        currentatomics=$((currentatomics*2))
+done
+exit
+#----------------------------
+# Test 2 - Threads vs Atomics
+#----------------------------
+totalatomics=1073741824 #268435456 # 2 pow 28
+maxthreads=1048576 #1024 # 2 pow 10
+currentthreads=8    # 2 pow 3
+while [ $currentthreads -le $maxthreads ]
+do
+        valIn2sPow=$(echo "l($(((currentthreads/8)*8)))/l(2)" | bc -l)
+
+	blocksize=8
+	while [ $blocksize -le 1024 ]
+	do
+        	echo ""
+	        echo ">>>Launching script to record benchmarks for Local Atomics. TotalAtomics: ${totalatomics}, MaxThreads: ${currentthreads}, BlockSize: ${blocksize}."
+	        /usr/local/cuda/bin/nvprof --normalized-time-unit s --print-summary-per-gpu --log-file "./output/Exp2/Exp2_LAEX_2Pow${valIn2sPow%.*}_BlocSize${blocksize}Atomics.csv" --csv ./sandbox laex $totalatomics $currentthreads $blocksize
+        	wait $!
+	        echo "<<<"
+        	echo ""
+	        sleep 1
+        	wait $!
+
+		blocksize=$((blocksize*2))
+	done
+
+	currentthreads=$((currentthreads*2))
+done
+
+#---------------------------------
+# Test 1 - Local vs Remote Atomics 
+#---------------------------------
+final=268435456	# 2 pow 28
+current=1024	# 2 pow 10
+while [ $current -le $final ]
+do
+	valIn2sPow=$(echo "l($(((current/1024)*1024)))/l(2)" | bc -l)
+
+	echo ""
+	echo ">>>Launching script to record benchmarks for Local Atomics. GridSize: $((current/1024)) BlockSize: 1024."
+	/usr/local/cuda/bin/nvprof --normalized-time-unit s --print-summary-per-gpu --log-file "./output/Exp1/Exp1_LA_2Pow${valIn2sPow%.*}Atomics.csv" --csv ./sandbox la $current/1024 1024
+	wait $!
+	echo "<<<"
+	echo ""
+	sleep 1
+	wait $!
+
+        echo ""
+        echo ">>>Launching script to record benchmarks for Remote Atomics. GridSize: $((current/1024)) BlockSize: 1024."
+	/usr/local/cuda/bin/nvprof --normalized-time-unit s --print-summary-per-gpu --log-file "./output/Exp1/Exp1_RA_2Pow${valIn2sPow%.*}Atomics.csv" --csv ./sandbox ra $current/1024 1024
+        wait $!
+        echo "<<<"
+        echo ""
+        sleep 1
+        wait $!
+
+        current=$((current*2)) 
+done
+
+
+
+
+
+
+
+echo ">>>>>>Script Ended!<<<<<<"
